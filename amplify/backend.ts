@@ -4,6 +4,7 @@ import { data } from './data/resource';
 import { storage } from './storage/resource'; // We need to create this!
 import { generateStaticJson } from './functions/generate-static-json/resource';
 import { cardParser } from './functions/card-parser/resource';
+import { searchAssistant } from './functions/search-assistant/resource';
 
 const backend = defineBackend({
   auth,
@@ -11,6 +12,7 @@ const backend = defineBackend({
   storage,
   generateStaticJson,
   cardParser,
+  searchAssistant,
 });
 
 /*
@@ -39,6 +41,15 @@ bucket.grantWrite(backend.generateStaticJson.resources.lambda);
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 
 backend.cardParser.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['bedrock:InvokeModel'],
+    resources: [
+      'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0',
+    ],
+  })
+);
+
+backend.searchAssistant.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['bedrock:InvokeModel'],
     resources: [

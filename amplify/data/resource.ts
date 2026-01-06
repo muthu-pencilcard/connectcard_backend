@@ -11,7 +11,16 @@ import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
  * - Includes 'country' and 'currency' to support Global Pricing (IN, US, UK, AE).
  */
 
+import { searchAssistant } from '../functions/search-assistant/resource';
+
 const schema = a.schema({
+  // AI Concierge Query
+  askAI: a.query()
+    .arguments({ prompt: a.string().required() })
+    .returns(a.json())
+    .handler(a.handler.function(searchAssistant))
+    .authorization(allow => [allow.publicApiKey(), allow.authenticated()]),
+
   // --- ENUMS ---
   CountryCode: a.enum(['IN', 'US', 'UK', 'AE']),
   CurrencyCode: a.enum(['INR', 'USD', 'GBP', 'AED']),

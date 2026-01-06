@@ -4,8 +4,8 @@ export const storage = defineStorage({
     name: 'connectCardStorage',
     access: (allow) => ({
         'public/*': [
-            allow.guest.to(['read']), // Public Profiles & JSON Dump
-            allow.authenticated.to(['read', 'write', 'delete']), // Business Owners uploading Loges
+            allow.guest.to(['read', 'write']), // Anyone can read profiles and upload logos for now
+            allow.authenticated.to(['read', 'write', 'delete']),
         ],
     })
 });

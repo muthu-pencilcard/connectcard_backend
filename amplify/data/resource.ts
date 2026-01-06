@@ -69,8 +69,11 @@ const schema = a.schema({
 
   // --- 2. SAVED CONTACT (User Retention) ---
   SavedContact: a.model({
-    userId: a.string().required(), // Cognitive Sub ID
-    businessId: a.string().required(), // Reference to BusinessCard.id
+    userId: a.string().required(), // Cognito Sub ID
+    businessId: a.string(),        // Reference to BusinessCard.id (Optional)
+
+    // Scanned Card Data (For cards NOT in directory)
+    scannedData: a.json(),         // Stores: { name, phone, email, fullText, imageKey }
 
     // Personalization
     customName: a.string(), // "My Plumber"

@@ -19,7 +19,7 @@ const backend = defineBackend({
 
 // 1. Grant Data Access
 const businessTable = backend.data.resources.tables['BusinessCard'];
-backend.generateStaticJson.resources.lambda.addEnvironment(
+(backend.generateStaticJson.resources.lambda as any).addEnvironment(
   'BUSINESS_CARD_TABLE_NAME',
   businessTable.tableName
 );
@@ -27,7 +27,7 @@ businessTable.grantReadData(backend.generateStaticJson.resources.lambda);
 
 // 2. Grant Storage Access
 const bucket = backend.storage.resources.bucket;
-backend.generateStaticJson.resources.lambda.addEnvironment(
+(backend.generateStaticJson.resources.lambda as any).addEnvironment(
   'STORAGE_BUCKET_NAME',
   bucket.bucketName
 );

@@ -94,6 +94,7 @@ const schema = a.schema({
   // --- 3. REVIEWS (Phase 0.5 Social Proof) ---
   Review: a.model({
     businessId: a.string().required(),
+    business: a.belongsTo('BusinessCard', 'businessId'), // <--- Added this line
     userId: a.string().required(),
     rating: a.integer().required(), // 1-5
     comment: a.string(),

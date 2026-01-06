@@ -67,6 +67,12 @@ const schema = a.schema({
     // Metadata
     desc: a.string(),
 
+    // External Platform Integration
+    googlePlaceId: a.string(), // Google Maps Place ID
+    googleMapsUrl: a.string(), // Direct link to Google Maps
+    yelpBusinessId: a.string(), // Yelp Business ID
+    yelpUrl: a.string(), // Direct link to Yelp page
+
     // --- RELATIONS ---
     reviews: a.hasMany('Review', 'businessId'),
     followers: a.hasMany('Follower', 'businessPk'), // Optional mapping
@@ -101,6 +107,8 @@ const schema = a.schema({
     ]),
 
   // --- 3. REVIEWS ---
+  ReviewSource: a.enum(['CONNECTCARD', 'GOOGLE', 'YELP']),
+
   Review: a.model({
     businessPk: a.string().required(),
     businessSk: a.string().required(),
@@ -110,9 +118,20 @@ const schema = a.schema({
     comment: a.string(),
     photoUrl: a.string(),
     isVerified: a.boolean().default(false),
+
+    // External Review Integration
+    source: a.ref('ReviewSource').default('CONNECTCARD'),
+    externalId: a.string(), // Original review ID from Google/Yelp
+    externalUrl: a.string(), // Link to original review
+    authorName: a.string(), // Reviewer name from external source
+    authorPhotoUrl: a.string(), // Reviewer photo from external source
+    reviewDate: a.datetime(), // Original review date
+    lastSyncedAt: a.datetime(), // When we last fetched this review
   })
     .secondaryIndexes(index => [
-      index('businessSk').sortKeys(['rating'])
+      index('businessSk').sortKeys(['rating']),
+      index('businessSk').sortKeys(['reviewDate']), // Sort by date
+      index('externalId'), // Prevent duplicate imports
     ])
     .authorization(allow => [
       allow.publicApiKey(),

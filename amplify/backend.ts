@@ -1,10 +1,11 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
-import { storage } from './storage/resource'; // We need to create this!
+import { storage } from './storage/resource';
 import { generateStaticJson } from './functions/generate-static-json/resource';
 import { cardParser } from './functions/card-parser/resource';
 import { searchAssistant } from './functions/search-assistant/resource';
+import { importReviews } from './functions/import-reviews/resource';
 
 const backend = defineBackend({
   auth,
@@ -13,6 +14,7 @@ const backend = defineBackend({
   generateStaticJson,
   cardParser,
   searchAssistant,
+  importReviews,
 });
 
 /*
@@ -57,3 +59,11 @@ backend.searchAssistant.resources.lambda.addToRolePolicy(
     ],
   })
 );
+
+// 4. Grant DynamoDB Access to importReviews
+const reviewTable = backend.data.resources.tables['Review'];
+(backend.importReviews.resources.lambda as any).addEnvironment(
+  'REVIEW_TABLE_NAME',
+  reviewTable.tableName
+);
+reviewTable.grantReadWriteData(backend.importReviews.resources.lambda);

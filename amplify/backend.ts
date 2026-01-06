@@ -6,6 +6,7 @@ import { generateStaticJson } from './functions/generate-static-json/resource';
 import { cardParser } from './functions/card-parser/resource';
 import { searchAssistant } from './functions/search-assistant/resource';
 import { importReviews } from './functions/import-reviews/resource';
+import { importFromGoogle } from './functions/import-from-google/resource';
 
 const backend = defineBackend({
   auth,
@@ -15,6 +16,7 @@ const backend = defineBackend({
   cardParser,
   searchAssistant,
   importReviews,
+  importFromGoogle,
 });
 
 /*

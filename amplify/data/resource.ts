@@ -1,11 +1,19 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { searchAssistant } from '../functions/search-assistant/resource';
+import { importFromGoogle } from '../functions/import-from-google/resource';
 
 /*
  * ConnectCard Data Schema
  */
 
 const schema = a.schema({
+  // External API Proxies
+  importFromGoogle: a.query()
+    .arguments({ placeId: a.string().required() })
+    .returns(a.json())
+    .authorization(allow => [allow.publicApiKey(), allow.authenticated()])
+    .handler(a.handler.function(importFromGoogle)),
+
   // AI Concierge Query
   askAI: a.query()
     .arguments({ prompt: a.string().required() })

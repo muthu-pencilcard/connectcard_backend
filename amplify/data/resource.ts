@@ -1,17 +1,9 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { searchAssistant } from '../functions/search-assistant/resource';
 
 /*
  * ConnectCard Data Schema
- * 
- * CORE MODELS:
- * 1. BusinessCard: The public profile (Directory Entry).
- * 2. SavedContact: The user's personal address book entry (Retention).
- * 
- * PRICING STRATEGY:
- * - Includes 'country' and 'currency' to support Global Pricing (IN, US, UK, AE).
  */
-
-import { searchAssistant } from '../functions/search-assistant/resource';
 
 const schema = a.schema({
   // AI Concierge Query
@@ -70,82 +62,74 @@ const schema = a.schema({
     // Metrics (Analytics)
     viewCount: a.integer().default(0),
     saveCount: a.integer().default(0),
+    catalogueViewCount: a.integer().default(0),
 
-    // Metadata (Flexible JSON/Dict for SEO & Hierarchy)
+    // Metadata
     desc: a.string(),
 
     // --- RELATIONS ---
     reviews: a.hasMany('Review', 'businessId'),
+    followers: a.hasMany('Follower', 'businessPk'), // Optional mapping
   })
     .identifier(['pk', 'sk'])
     .secondaryIndexes(index => [
-      index('slug').queryField('getBusinessBySlug') // Fast lookup by slug for SEO pages
+      index('slug').queryField('getBusinessBySlug')
     ])
     .authorization(allow => [
-      allow.publicApiKey(), // Anyone can read (SEO)
-      allow.owner(),        // Owner can edit
+      allow.publicApiKey(),
+      allow.owner(),
     ]),
 
   // --- 2. SAVED CONTACT (User Retention) ---
   SavedContact: a.model({
-    userId: a.string().required(), // Cognito Sub ID
+    userId: a.string().required(),
     businessPk: a.string(),
     businessSk: a.string(),
-
-    // Scanned Card Data (For cards NOT in directory)
-    scannedData: a.json(),         // Stores: { name, phone, email, fullText, imageKey }
-
-    // Personalization
-    customName: a.string(), // "My Plumber"
-    tags: a.string().array(), // ["Emergency", "Home"]
+    scannedData: a.json(),
+    customName: a.string(),
+    tags: a.string().array(),
     personalNotes: a.string(),
-
-    // Smart Reminders
-    reminderDate: a.datetime(), // Next Due Date
-    reminderLabel: a.string(), // "AC Service"
-
-    // Offline Sync Metadata
+    reminderDate: a.datetime(),
+    reminderLabel: a.string(),
     lastSyncedAt: a.datetime(),
   })
     .secondaryIndexes(index => [
-      index('userId').sortKeys(['businessSk']) // Fast lookup: "Get my contacts"
+      index('userId').sortKeys(['businessSk'])
     ])
     .authorization(allow => [
-      allow.owner(), // Only I can see my saved contacts
+      allow.owner(),
     ]),
 
-  // --- 3. REVIEWS (Phase 0.5 Social Proof) ---
+  // --- 3. REVIEWS ---
   Review: a.model({
     businessPk: a.string().required(),
     businessSk: a.string().required(),
     business: a.belongsTo('BusinessCard', ['businessPk', 'businessSk']),
     userId: a.string().required(),
-    rating: a.integer().required(), // 1-5
+    rating: a.integer().required(),
     comment: a.string(),
-    photoUrl: a.string(), // Proof of work
+    photoUrl: a.string(),
     isVerified: a.boolean().default(false),
   })
     .secondaryIndexes(index => [
-      index('businessSk').sortKeys(['rating']) // Query by BIZ#slug
+      index('businessSk').sortKeys(['rating'])
     ])
     .authorization(allow => [
-      allow.publicApiKey(), // Public can read
-      allow.owner(),        // User can edit their review
+      allow.publicApiKey(),
+      allow.owner(),
     ]),
-  // --- 4. SPACES (Curated Communities) ---
-  Space: a.model({
-    pk: a.string().required(), // Hierarchy: CAT#category#CITY#city
-    sk: a.string().required(), // Identity: SPACE#name
 
+  // --- 4. SPACES ---
+  Space: a.model({
+    pk: a.string().required(),
+    sk: a.string().required(),
     name: a.string().required(),
     description: a.string(),
     icon: a.string(),
     banner: a.string(),
-    category: a.string(), // "Plumber"
-    city: a.string(),     // "Bangalore"
+    category: a.string(),
+    city: a.string(),
     isPublic: a.boolean().default(true),
-
-    // Relations
     businesses: a.hasMany('BusinessInSpace', 'spaceId'),
   })
     .identifier(['pk', 'sk'])
@@ -154,11 +138,9 @@ const schema = a.schema({
       allow.owner(),
     ]),
 
-  // Join Model for Many-to-Many (Business <-> Space)
   BusinessInSpace: a.model({
     businessId: a.string().required(),
     spaceId: a.string().required(),
-
     business: a.belongsTo('BusinessCard', 'businessId'),
     space: a.belongsTo('Space', 'spaceId'),
   })
@@ -167,23 +149,22 @@ const schema = a.schema({
       allow.owner(),
     ]),
 
-  // --- 5. PRIVATE MESSAGING (Lead Conversion) ---
+  // --- 5. PRIVATE MESSAGING ---
   ChatRoom: a.model({
     businessPk: a.string().required(),
     businessSk: a.string().required(),
     business: a.belongsTo('BusinessCard', ['businessPk', 'businessSk']),
-    userSub: a.string().required(), // The customer
+    userSub: a.string().required(),
     lastMessage: a.string(),
     lastMessageAt: a.datetime(),
-
     messages: a.hasMany('ChatMessage', 'chatRoomId'),
   })
     .secondaryIndexes(index => [
-      index('userSub').sortKeys(['lastMessageAt']), // User's "Inbox"
-      index('businessSk').sortKeys(['lastMessageAt']), // Merchant's "Inquiries"
+      index('userSub').sortKeys(['lastMessageAt']),
+      index('businessSk').sortKeys(['lastMessageAt']),
     ])
     .authorization(allow => [
-      allow.authenticated(), // Both parties need to be logged in
+      allow.authenticated(),
       allow.owner(),
     ]),
 
@@ -192,10 +173,126 @@ const schema = a.schema({
     chatRoom: a.belongsTo('ChatRoom', 'chatRoomId'),
     senderSub: a.string().required(),
     content: a.string().required(),
-    type: a.string().default('TEXT'), // TEXT, PHOTO, INQUIRY
+    type: a.string().default('TEXT'),
   })
     .authorization(allow => [
       allow.authenticated(),
+      allow.owner(),
+    ]),
+
+  // --- 6. FOLLOWER ---
+  Follower: a.model({
+    userId: a.string().required(),
+    businessPk: a.string().required(),
+    businessSk: a.string().required(),
+    business: a.belongsTo('BusinessCard', ['businessPk', 'businessSk']),
+    deviceToken: a.string(),
+    platform: a.string(),
+    notificationsEnabled: a.boolean().default(true),
+    followedAt: a.datetime(),
+  })
+    .secondaryIndexes(index => [
+      index('userId').sortKeys(['businessSk']),
+      index('businessSk').sortKeys(['userId']),
+    ])
+    .authorization(allow => [
+      allow.owner(),
+      allow.authenticated(),
+    ]),
+
+  // --- 7. BROADCAST MESSAGE ---
+  BroadcastMessage: a.model({
+    businessPk: a.string().required(),
+    businessSk: a.string().required(),
+    business: a.belongsTo('BusinessCard', ['businessPk', 'businessSk']),
+    title: a.string().required(),
+    message: a.string().required(),
+    imageUrl: a.string(),
+    actionUrl: a.string(),
+    postedAt: a.datetime(),
+    expiresAt: a.datetime(),
+  })
+    .secondaryIndexes(index => [
+      index('businessSk').sortKeys(['postedAt']),
+    ])
+    .authorization(allow => [
+      allow.publicApiKey(),
+      allow.owner(),
+    ]),
+
+  // --- 8. CATALOGUE EVENT (Monetization Audit Trail) ---
+  CatalogueEvent: a.model({
+    businessPk: a.string().required(),
+    businessSk: a.string().required(),
+    userId: a.string().required(),
+    timestamp: a.datetime().required(),
+    itemType: a.string(),
+    itemId: a.string(),
+  })
+    .secondaryIndexes(index => [
+      index('businessSk').sortKeys(['timestamp']),
+    ])
+    .authorization(allow => [
+      allow.owner(),
+      allow.authenticated(),
+    ]),
+
+  // --- 9. BOOKING (Appointment System) ---
+  Booking: a.model({
+    businessPk: a.string().required(),
+    businessSk: a.string().required(),
+    business: a.belongsTo('BusinessCard', ['businessPk', 'businessSk']),
+
+    userId: a.string().required(), // Customer
+    customerName: a.string().required(),
+    customerPhone: a.string().required(),
+    customerEmail: a.string(),
+
+    // Appointment Details
+    serviceType: a.string(), // "Haircut", "Plumbing", etc.
+    appointmentDate: a.datetime().required(),
+    duration: a.integer(), // Minutes
+    notes: a.string(),
+
+    // Status
+    status: a.string().default('PENDING'), // PENDING, CONFIRMED, CANCELLED, COMPLETED
+    confirmedAt: a.datetime(),
+    cancelledAt: a.datetime(),
+    cancellationReason: a.string(),
+  })
+    .secondaryIndexes(index => [
+      index('businessSk').sortKeys(['appointmentDate']), // Business's calendar
+      index('userId').sortKeys(['appointmentDate']), // Customer's bookings
+    ])
+    .authorization(allow => [
+      allow.owner(),
+      allow.authenticated(),
+    ]),
+
+  // --- 10. OFFERS & DEALS (Promotions) ---
+  Offer: a.model({
+    businessPk: a.string().required(),
+    businessSk: a.string().required(),
+    business: a.belongsTo('BusinessCard', ['businessPk', 'businessSk']),
+
+    title: a.string().required(), // "20% Off Haircut"
+    description: a.string(),
+    promoCode: a.string(), // "WELCOME20"
+    discountType: a.enum(['PERCENTAGE', 'FIXED_AMOUNT', 'BOGO']),
+    discountValue: a.float(),
+
+    startDate: a.datetime(),
+    endDate: a.datetime(),
+    isActive: a.boolean().default(true),
+
+    usageLimit: a.integer(), // Max redemptions total
+    usageCount: a.integer().default(0),
+  })
+    .secondaryIndexes(index => [
+      index('businessSk').sortKeys(['endDate']), // Active offers for a biz
+    ])
+    .authorization(allow => [
+      allow.publicApiKey(), // Everyone sees offers
       allow.owner(),
     ]),
 });
@@ -207,7 +304,7 @@ export const data = defineData({
   authorizationModes: {
     defaultAuthorizationMode: 'apiKey',
     apiKeyAuthorizationMode: {
-      expiresInDays: 30, // Long-lived for public access
+      expiresInDays: 30,
     },
   },
 });

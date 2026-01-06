@@ -19,8 +19,12 @@ const schema = a.schema({
 
   // --- 1. BUSINESS CARD (Public Directory) ---
   BusinessCard: a.model({
+    // Single Table Design Keys
+    pk: a.string().required(), // Hierarchy: COUNTRY#STATE#CITY#AREA
+    sk: a.string().required(), // Identity: BIZ#slug or USER#id
+
     // Identity
-    slug: a.string().required(), // URL-friendly ID e.g. "rk-plumbing"
+    slug: a.string().required(),
     businessName: a.string().required(),
     tagline: a.string(),
 
@@ -31,14 +35,14 @@ const schema = a.schema({
     whatsapp: a.string(),
 
     // Location & SEO
-    category: a.string().required(), // "Plumber"
+    category: a.string().required(),
     address: a.string(),
     city: a.string(),
     location: a.customType({
       lat: a.float(),
       lng: a.float(),
     }),
-    serviceAreaRadius: a.integer(), // km
+    serviceAreaRadius: a.integer(),
 
     // Global Pricing Logic
     country: a.ref('CountryCode'),
@@ -48,20 +52,26 @@ const schema = a.schema({
     // Media (S3 Keys)
     logoUrl: a.string(),
     coverPhotoUrl: a.string(),
-    galleryUrls: a.string().array(), // Max 5 (Starter) -> Unlimited (Ent)
+    galleryUrls: a.string().array(),
 
     // Operational
-    hours: a.json(), // Structured JSON: { "mon": "9-5", "tue": "9-5" ... }
+    hours: a.json(),
     isVerified: a.boolean().default(false),
 
     // Metrics (Analytics)
     viewCount: a.integer().default(0),
     saveCount: a.integer().default(0),
 
+    // Metadata (Flexible JSON/Dict for SEO & Hierarchy)
+    desc: a.string(),
+
     // --- RELATIONS ---
-    // A Business can have many Reviews (Phase 0.5)
     reviews: a.hasMany('Review', 'businessId'),
   })
+    .identifier(['pk', 'sk'])
+    .secondaryIndexes(index => [
+      index('slug').queryField('getBusinessBySlug') // Fast lookup by slug for SEO pages
+    ])
     .authorization(allow => [
       allow.publicApiKey(), // Anyone can read (SEO)
       allow.owner(),        // Owner can edit
@@ -70,7 +80,8 @@ const schema = a.schema({
   // --- 2. SAVED CONTACT (User Retention) ---
   SavedContact: a.model({
     userId: a.string().required(), // Cognito Sub ID
-    businessId: a.string(),        // Reference to BusinessCard.id (Optional)
+    businessPk: a.string(),
+    businessSk: a.string(),
 
     // Scanned Card Data (For cards NOT in directory)
     scannedData: a.json(),         // Stores: { name, phone, email, fullText, imageKey }
@@ -88,7 +99,7 @@ const schema = a.schema({
     lastSyncedAt: a.datetime(),
   })
     .secondaryIndexes(index => [
-      index('userId').sortKeys(['businessId']) // Fast lookup: "Get my contacts"
+      index('userId').sortKeys(['businessSk']) // Fast lookup: "Get my contacts"
     ])
     .authorization(allow => [
       allow.owner(), // Only I can see my saved contacts
@@ -96,8 +107,9 @@ const schema = a.schema({
 
   // --- 3. REVIEWS (Phase 0.5 Social Proof) ---
   Review: a.model({
-    businessId: a.string().required(),
-    business: a.belongsTo('BusinessCard', 'businessId'), // <--- Added this line
+    businessPk: a.string().required(),
+    businessSk: a.string().required(),
+    business: a.belongsTo('BusinessCard', ['businessPk', 'businessSk']),
     userId: a.string().required(),
     rating: a.integer().required(), // 1-5
     comment: a.string(),
@@ -105,11 +117,45 @@ const schema = a.schema({
     isVerified: a.boolean().default(false),
   })
     .secondaryIndexes(index => [
-      index('businessId').sortKeys(['rating']) // "Get reviews for this business"
+      index('businessSk').sortKeys(['rating']) // Query by BIZ#slug
     ])
     .authorization(allow => [
       allow.publicApiKey(), // Public can read
       allow.owner(),        // User can edit their review
+    ]),
+  // --- 4. SPACES (Curated Communities) ---
+  Space: a.model({
+    pk: a.string().required(), // Hierarchy: CAT#category#CITY#city
+    sk: a.string().required(), // Identity: SPACE#name
+
+    name: a.string().required(),
+    description: a.string(),
+    icon: a.string(),
+    banner: a.string(),
+    category: a.string(), // "Plumber"
+    city: a.string(),     // "Bangalore"
+    isPublic: a.boolean().default(true),
+
+    // Relations
+    businesses: a.hasMany('BusinessInSpace', 'spaceId'),
+  })
+    .identifier(['pk', 'sk'])
+    .authorization(allow => [
+      allow.publicApiKey(),
+      allow.owner(),
+    ]),
+
+  // Join Model for Many-to-Many (Business <-> Space)
+  BusinessInSpace: a.model({
+    businessId: a.string().required(),
+    spaceId: a.string().required(),
+
+    business: a.belongsTo('BusinessCard', 'businessId'),
+    space: a.belongsTo('Space', 'spaceId'),
+  })
+    .authorization(allow => [
+      allow.publicApiKey(),
+      allow.owner(),
     ]),
 });
 

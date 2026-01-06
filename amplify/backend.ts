@@ -3,12 +3,14 @@ import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource'; // We need to create this!
 import { generateStaticJson } from './functions/generate-static-json/resource';
+import { cardParser } from './functions/card-parser/resource';
 
 const backend = defineBackend({
   auth,
   data,
   storage,
   generateStaticJson,
+  cardParser,
 });
 
 /*
@@ -32,3 +34,15 @@ const bucket = backend.storage.resources.bucket;
   bucket.bucketName
 );
 bucket.grantWrite(backend.generateStaticJson.resources.lambda);
+
+// 3. Grant Bedrock Access to cardParser
+import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
+
+backend.cardParser.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['bedrock:InvokeModel'],
+    resources: [
+      'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0',
+    ],
+  })
+);

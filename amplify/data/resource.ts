@@ -157,6 +157,38 @@ const schema = a.schema({
       allow.publicApiKey(),
       allow.owner(),
     ]),
+
+  // --- 5. PRIVATE MESSAGING (Lead Conversion) ---
+  ChatRoom: a.model({
+    businessPk: a.string().required(),
+    businessSk: a.string().required(),
+    business: a.belongsTo('BusinessCard', ['businessPk', 'businessSk']),
+    userSub: a.string().required(), // The customer
+    lastMessage: a.string(),
+    lastMessageAt: a.datetime(),
+
+    messages: a.hasMany('ChatMessage', 'chatRoomId'),
+  })
+    .secondaryIndexes(index => [
+      index('userSub').sortKeys(['lastMessageAt']), // User's "Inbox"
+      index('businessSk').sortKeys(['lastMessageAt']), // Merchant's "Inquiries"
+    ])
+    .authorization(allow => [
+      allow.authenticated(), // Both parties need to be logged in
+      allow.owner(),
+    ]),
+
+  ChatMessage: a.model({
+    chatRoomId: a.string().required(),
+    chatRoom: a.belongsTo('ChatRoom', 'chatRoomId'),
+    senderSub: a.string().required(),
+    content: a.string().required(),
+    type: a.string().default('TEXT'), // TEXT, PHOTO, INQUIRY
+  })
+    .authorization(allow => [
+      allow.authenticated(),
+      allow.owner(),
+    ]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
